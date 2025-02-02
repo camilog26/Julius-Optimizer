@@ -1,0 +1,349 @@
+//@version=6
+strategy("LNL Scalper Strategy", shorttitle="LNL Scalper Strategy", overlay=true)
+
+// Inputs
+TrendStrength = input.int(20, title="Trend Strength", tooltip="Trend Strength: Adjustable length for the Trend Gauge (exponential moving average).", inline="Trend")
+VolumeFilter = input.bool(true, title="Enable Volume Filter", tooltip="Enable volume filter to reduce false signals. Signals will only be triggered if the volume is above the moving average volume.", inline="Volume")
+
+LabelSize = input.string("normal", title="Label Size", options=["small", "normal", "large"], tooltip="Choose the size of the labels for signals.")
+
+TP1_Percent = input.float(1.5, title="Take Profit 1 (%)", inline="TP")
+TP2_Percent = input.float(2.5, title="Take Profit 2 (%)", inline="TP")
+TP3_Percent = input.float(3.6, title="Take Profit 3 (%)", inline="TP")
+TP4_Percent = input.float(5.0, title="Take Profit 4 (%)", inline="TP")
+TP5_Percent = input.float(6.5, title="Take Profit 5 (%)", inline="TP")
+SL_Percent = input.float(1.0, title="Stop Loss (%)", inline="SL")
+
+// Auto TP Definitions
+TP1AI = input.bool(true, title="Enable TP1 AI", tooltip="Enable AI for Take Profit 1")
+TP2AI = input.bool(true, title="Enable TP2 AI", tooltip="Enable AI for Take Profit 2")
+TP3AI = input.bool(true, title="Enable TP3 AI", tooltip="Enable AI for Take Profit 3")
+TP4AI = input.bool(true, title="Enable TP4 AI", tooltip="Enable AI for Take Profit 4")
+TP5AI = input.bool(true, title="Enable TP5 AI", tooltip="Enable AI for Take Profit 5")
+
+long_tp1_lv = input.float(50, title="Long TP1 Level")
+long_tp2_lv = input.float(100, title="Long TP2 Level")
+long_tp3_lv = input.float(150, title="Long TP3 Level")
+long_tp4_lv = input.float(200, title="Long TP4 Level")
+long_tp5_lv = input.float(250, title="Long TP5 Level")
+short_tp1_lv = input.float(50, title="Short TP1 Level")
+short_tp2_lv = input.float(100, title="Short TP2 Level")
+short_tp3_lv = input.float(150, title="Short TP3 Level")
+short_tp4_lv = input.float(200, title="Short TP4 Level")
+short_tp5_lv = input.float(250, title="Short TP5 Level")
+long_sl_lv = input.float(10, title="Long Stop Loss Level")
+short_sl_lv = input.float(10, title="Short Stop Loss Level")
+
+supertrend120 = ta.sma(close, 120)
+supertrend240 = ta.sma(close, 240)
+supertrendD = ta.sma(close, 365)
+
+// TP1
+float TP1Long = na
+string TP1Longlabel = na
+float TP1Short = na
+string TP1Shortlabel = na
+
+if TP1AI and (supertrend120 < long_tp1_lv + long_tp1_lv * 0.01 and supertrend120 > long_tp1_lv - long_tp1_lv * 0.01)
+    TP1Long := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP1Longlabel := "AutoTP1"
+else if TP1AI and (supertrend240 < long_tp1_lv + long_tp1_lv * 0.01 and supertrend240 > long_tp1_lv - long_tp1_lv * 0.01)
+    TP1Long := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP1Longlabel := "AutoTP1"
+else
+    TP1Long := TP1_Percent
+    TP1Longlabel := "TP1"
+
+if TP1AI and (supertrend120 < short_tp1_lv + short_tp1_lv * 0.01 and supertrend120 > short_tp1_lv - short_tp1_lv * 0.01)
+    TP1Short := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP1Shortlabel := "AutoTP1"
+else if TP1AI and (supertrend240 < short_tp1_lv + short_tp1_lv * 0.01 and supertrend240 > short_tp1_lv - short_tp1_lv * 0.01)
+    TP1Short := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP1Shortlabel := "AutoTP1"
+else
+    TP1Short := TP1_Percent
+    TP1Shortlabel := "TP1"
+
+// TP2
+float TP2Long = na
+string TP2Longlabel = na
+float TP2Short = na
+string TP2Shortlabel = na
+
+if TP2AI and (supertrend120 < long_tp2_lv + long_tp2_lv * 0.01 and supertrend120 > long_tp2_lv - long_tp2_lv * 0.01)
+    TP2Long := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP2Longlabel := "AutoTP2"
+else if TP2AI and (supertrend240 < long_tp2_lv + long_tp2_lv * 0.01 and supertrend240 > long_tp2_lv - long_tp2_lv * 0.01)
+    TP2Long := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP2Longlabel := "AutoTP2"
+else if TP2AI and (supertrendD < long_tp2_lv + long_tp2_lv * 0.01 and supertrendD > long_tp2_lv - long_tp2_lv * 0.01)
+    TP2Long := ((supertrendD - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP2Longlabel := "AutoTP2"
+else
+    TP2Long := TP2_Percent
+    TP2Longlabel := "TP2"
+
+if TP2AI and (supertrend120 < short_tp2_lv + short_tp2_lv * 0.01 and supertrend120 > short_tp2_lv - short_tp2_lv * 0.01)
+    TP2Short := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP2Shortlabel := "AutoTP2"
+else if TP2AI and (supertrend240 < short_tp2_lv + short_tp2_lv * 0.01 and supertrend240 > short_tp2_lv - short_tp2_lv * 0.01)
+    TP2Short := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP2Shortlabel := "AutoTP2"
+else
+    TP2Short := TP2_Percent
+    TP2Shortlabel := "TP2"
+
+// TP3
+float TP3Long = na
+string TP3Longlabel = na
+float TP3Short = na
+string TP3Shortlabel = na
+
+if TP3AI and (supertrend120 < long_tp3_lv + long_tp3_lv * 0.01 and supertrend120 > long_tp3_lv - long_tp3_lv * 0.01)
+    TP3Long := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP3Longlabel := "AutoTP3"
+else if TP3AI and (supertrend240 < long_tp3_lv + long_tp3_lv * 0.01 and supertrend240 > long_tp3_lv - long_tp3_lv * 0.01)
+    TP3Long := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP3Longlabel := "AutoTP3"
+else if TP3AI and (supertrendD < long_tp3_lv + long_tp3_lv * 0.01 and supertrendD > long_tp3_lv - long_tp3_lv * 0.01)
+    TP3Long := ((supertrendD - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP3Longlabel := "AutoTP3"
+else
+    TP3Long := TP3_Percent
+    TP3Longlabel := "TP3"
+
+if TP3AI and (supertrend120 < short_tp3_lv + short_tp3_lv * 0.01 and supertrend120 > short_tp3_lv - short_tp3_lv * 0.01)
+    TP3Short := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP3Shortlabel := "AutoTP3"
+else if TP3AI and (supertrend240 < short_tp3_lv + short_tp3_lv * 0.01 and supertrend240 > short_tp3_lv - short_tp3_lv * 0.01)
+    TP3Short := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP3Shortlabel := "AutoTP3"
+else
+    TP3Short := TP3_Percent
+    TP3Shortlabel := "TP3"
+
+// TP4
+float TP4Long = na
+string TP4Longlabel = na
+float TP4Short = na
+string TP4Shortlabel = na
+
+if TP4AI and (supertrend120 < long_tp4_lv + long_tp4_lv * 0.01 and supertrend120 > long_tp4_lv - long_tp4_lv * 0.01)
+    TP4Long := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP4Longlabel := "AutoTP4"
+else if TP4AI and (supertrend240 < long_tp4_lv + long_tp4_lv * 0.01 and supertrend240 > long_tp4_lv - long_tp4_lv * 0.01)
+    TP4Long := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP4Longlabel := "AutoTP4"
+else if TP4AI and (supertrendD < long_tp4_lv + long_tp4_lv * 0.01 and supertrendD > long_tp4_lv - long_tp4_lv * 0.01)
+    TP4Long := ((supertrendD - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP4Longlabel := "AutoTP4"
+else
+    TP4Long := TP4_Percent
+    TP4Longlabel := "TP4"
+
+if TP4AI and (supertrend120 < short_tp4_lv + short_tp4_lv * 0.01 and supertrend120 > short_tp4_lv - short_tp4_lv * 0.01)
+    TP4Short := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP4Shortlabel := "AutoTP4"
+else if TP4AI and (supertrend240 < short_tp4_lv + short_tp4_lv * 0.01 and supertrend240 > short_tp4_lv - short_tp4_lv * 0.01)
+    TP4Short := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP4Shortlabel := "AutoTP4"
+else
+    TP4Short := TP4_Percent
+    TP4Shortlabel := "TP4"
+
+// TP5
+float TP5Long = na
+string TP5Longlabel = na
+float TP5Short = na
+string TP5Shortlabel = na
+
+if TP5AI and (supertrend120 < long_tp5_lv + long_tp5_lv * 0.01 and supertrend120 > long_tp5_lv - long_tp5_lv * 0.01)
+    TP5Long := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP5Longlabel := "AutoTP5"
+else if TP5AI and (supertrend240 < long_tp5_lv + long_tp5_lv * 0.01 and supertrend240 > long_tp5_lv - long_tp5_lv * 0.01)
+    TP5Long := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP5Longlabel := "AutoTP5"
+else if TP5AI and (supertrendD < long_tp5_lv + long_tp5_lv * 0.01 and supertrendD > long_tp5_lv - long_tp5_lv * 0.01)
+    TP5Long := ((supertrendD - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP5Longlabel := "AutoTP5"
+else
+    TP5Long := TP5_Percent
+    TP5Longlabel := "TP5"
+
+if TP5AI and (supertrend120 < short_tp5_lv + short_tp5_lv * 0.01 and supertrend120 > short_tp5_lv - short_tp5_lv * 0.01)
+    TP5Short := ((supertrend120 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP5Shortlabel := "AutoTP5"
+else if TP5AI and (supertrend240 < short_tp5_lv + short_tp5_lv * 0.01 and supertrend240 > short_tp5_lv - short_tp5_lv * 0.01)
+    TP5Short := ((supertrend240 - strategy.position_avg_price) / strategy.position_avg_price) * 100
+    TP5Shortlabel := "AutoTP5"
+else
+    TP5Short := TP5_Percent
+    TP5Shortlabel := "TP5"
+
+// Functions & Definitions
+avg = ta.ema(close, TrendStrength)
+rsi = ta.rsi(close, 30)
+volumeMA = ta.sma(volume, 20) // Moving average of volume
+TrendColor = avg < open and avg < close and rsi > 50 ? color.new(#00C8E8, 0) : avg > open and avg > close and rsi < 50 ? color.new(#FF6B6B, 0) : color.new(color.gray, 0)
+plot(avg, title="Trend", color=TrendColor, linewidth=2)
+
+// Position Management
+var float entryPrice = na
+var string positionState = "neutral" // Variable to track the current position state
+
+if barstate.isconfirmed
+    if VolumeFilter and volume < volumeMA
+        // Skip signals if volume filter is enabled and volume is below the moving average
+        na
+    else
+        if TrendColor == color.new(#00C8E8, 0) and positionState != "long"
+            strategy.entry("Long", strategy.long)
+            entryPrice := close
+            positionState := "long"
+            label.new(bar_index, low, "📈 LONG", color=color.new(#00C8E8, 0), textcolor=color.white, size=LabelSize == "small" ? size.small : LabelSize == "large" ? size.large : size.normal, style=label.style_label_up)
+    
+        if TrendColor == color.new(#FF6B6B, 0) and positionState != "short"
+            strategy.entry("Short", strategy.short)
+            entryPrice := close
+            positionState := "short"
+            label.new(bar_index, high, "📉 SHORT", color=color.new(#FF6B6B, 0), textcolor=color.white, size=LabelSize == "small" ? size.small : LabelSize == "large" ? size.large : size.normal, style=label.style_label_down)
+    
+        if TrendColor == color.new(color.gray, 0)
+            strategy.close("Long")
+            strategy.close("Short")
+            positionState := "neutral"
+            label.new(bar_index, na, "✖️ CLOSE", color=color.new(color.gray, 0), textcolor=color.white, size=LabelSize == "small" ? size.small : LabelSize == "large" ? size.large : size.normal, style=label.style_label_down)
+
+// Take Profit and Stop Loss Management
+tp1 = entryPrice * (1 + TP1_Percent / 100)
+tp2 = entryPrice * (1 + TP2_Percent / 100)
+tp3 = entryPrice * (1 + TP3_Percent / 100)
+tp4 = entryPrice * (1 + TP4_Percent / 100)
+tp5 = entryPrice * (1 + TP5_Percent / 100)
+sl = entryPrice * (1 - SL_Percent / 100)
+
+if positionState == "long"
+    strategy.exit("TP1", from_entry="Long", limit=tp1, qty_percent=20)
+    strategy.exit("TP2", from_entry="Long", limit=tp2, qty_percent=20, stop=entryPrice * 1.002)
+    strategy.exit("TP3", from_entry="Long", limit=tp3, qty_percent=20)
+    strategy.exit("TP4", from_entry="Long", limit=tp4, qty_percent=20)
+    strategy.exit("TP5", from_entry="Long", limit=tp5, qty_percent=20)
+    strategy.exit("SL", from_entry="Long", stop=sl)
+
+if positionState == "short"
+    strategy.exit("TP1", from_entry="Short", limit=entryPrice * (1 - TP1_Percent / 100), qty_percent=20)
+    strategy.exit("TP2", from_entry="Short", limit=entryPrice * (1 - TP2_Percent / 100), qty_percent=20, stop=entryPrice * 0.998)
+    strategy.exit("TP3", from_entry="Short", limit=entryPrice * (1 - TP3_Percent / 100), qty_percent=20)
+    strategy.exit("TP4", from_entry="Short", limit=entryPrice * (1 - TP4_Percent / 100), qty_percent=20)
+    strategy.exit("TP5", from_entry="Short", limit=entryPrice * (1 - TP5_Percent / 100), qty_percent=20)
+    strategy.exit("SL", from_entry="Short", stop=entryPrice * (1 + SL_Percent / 100))
+
+// Close all positions at the end of the session
+closeAtSessionEnd = input.bool(true, title="Close Positions at Session End")
+sessionFilter = input.bool(false, title="Session Filter")
+if closeAtSessionEnd and not sessionFilter
+    strategy.close_all(comment="Fine Sessione")
+
+// Plot TP & SL
+plot(strategy.position_size > 0 ? entryPrice * (1 - SL_Percent / 100) : na, color=color.new(color.red, 20), style=plot.style_linebr, title="SL Long")
+plot(strategy.position_size < 0 ? entryPrice * (1 + SL_Percent / 100) : na, color=color.new(color.red, 20), style=plot.style_linebr, title="SL Short")
+
+plot(strategy.position_size > 0 ? entryPrice * (1 + TP1_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP1")
+plot(strategy.position_size > 0 ? entryPrice * (1 + TP2_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP2")
+plot(strategy.position_size > 0 ? entryPrice * (1 + TP3_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP3")
+plot(strategy.position_size > 0 ? entryPrice * (1 + TP4_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP4")
+plot(strategy.position_size > 0 ? entryPrice * (1 + TP5_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP5")
+
+plot(strategy.position_size < 0 ? entryPrice * (1 - TP1_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP1")
+plot(strategy.position_size < 0 ? entryPrice * (1 - TP2_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP2")
+plot(strategy.position_size < 0 ? entryPrice * (1 - TP3_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP3")
+plot(strategy.position_size < 0 ? entryPrice * (1 - TP4_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP4")
+plot(strategy.position_size < 0 ? entryPrice * (1 - TP5_Percent / 100) : na, color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP5")
+
+// Label TP/SL
+_x = timenow + math.round(ta.change(time) * 2)
+
+draw_label(y1, y2, label1, label2, percent1, percent2, _textcolor) =>
+    var label Label = na
+    label.delete(Label)
+    Label := label.new(_x, strategy.position_size > 0 ? y1 : y2, strategy.position_size > 0 ? '' + str.tostring(label1) + ': ' + str.tostring(math.round(y1, 2)) + ' (' + str.tostring(math.round(percent1, 2)) + '%)' : '' + str.tostring(label2) + ': ' + str.tostring(math.round(y2, 2)) + ' (' + str.tostring(math.round(percent2, 2)) + '%)', color=color.new(color.white, 100), textcolor=_textcolor, style=label.style_label_left, yloc=yloc.price, xloc=xloc.bar_time, size=size.small, textalign=text.align_left)
+    Label
+
+if barstate.islast
+    draw_label(entryPrice * (1 + TP1_Percent / 100), entryPrice * (1 - TP1_Percent / 100), TP1Longlabel, TP1Shortlabel, TP1_Percent, TP1_Percent, color.lime)
+    draw_label(entryPrice * (1 + TP2_Percent / 100), entryPrice * (1 - TP2_Percent / 100), TP2Longlabel, TP2Shortlabel, TP2_Percent, TP2_Percent, color.lime)
+    draw_label(entryPrice * (1 + TP3_Percent / 100), entryPrice * (1 - TP3_Percent / 100), TP3Longlabel, TP3Shortlabel, TP3_Percent, TP3_Percent, color.lime)
+    draw_label(entryPrice * (1 + TP4_Percent / 100), entryPrice * (1 - TP4_Percent / 100), TP4Longlabel, TP4Shortlabel, TP4_Percent, TP4_Percent, color.lime)
+    draw_label(entryPrice * (1 + TP5_Percent / 100), entryPrice * (1 - TP5_Percent / 100), TP5Longlabel, TP5Shortlabel, TP5_Percent, TP5_Percent, color.lime)
+    draw_label(entryPrice * (1 - SL_Percent / 100), entryPrice * (1 + SL_Percent / 100), "SL", "SL", SL_Percent, SL_Percent, color.red)
+
+// Dashboard for monitoring
+var table dashboard = table.new(position.top_right, 2, 8, border_width=1)
+
+// Initialize counters
+var int totalTrades = 0
+var int tp1Count = 0
+var int tp2Count = 0
+var int tp3Count = 0
+var int tp4Count = 0
+var int tp5Count = 0
+var int slCount = 0
+var int beCount = 0
+
+// Update counters based on strategy exit conditions
+for i = 0 to strategy.closedtrades - 1
+    trade = strategy.closedtrades[i]
+    profit = strategy.closedtrades.profit(i)
+    if profit == tp1
+        tp1Count := tp1Count + 1
+    if profit == tp2
+        tp2Count := tp2Count + 1
+    if profit == tp3
+        tp3Count := tp3Count + 1
+    if profit == tp4
+        tp4Count := tp4Count + 1
+    if profit == tp5
+        tp5Count := tp5Count + 1
+    if profit == sl
+        slCount := slCount + 1
+    totalTrades := totalTrades + 1
+
+// Update dashboard table
+if barstate.islast
+    table.cell(dashboard, 0, 0, "Total Trades", bgcolor=color.blue, text_color=color.white)
+    table.cell(dashboard, 1, 0, str.tostring(totalTrades), bgcolor=color.white, text_color=color.black)
+    
+    table.cell(dashboard, 0, 1, "TP1 Hits", bgcolor=color.green, text_color=color.white)
+    table.cell(dashboard, 1, 1, str.tostring(tp1Count), bgcolor=color.white, text_color=color.black)
+    
+    table.cell(dashboard, 0, 2, "TP2 Hits", bgcolor=color.green, text_color=color.white)
+    table.cell(dashboard, 1, 2, str.tostring(tp2Count), bgcolor=color.white, text_color=color.black)
+    
+    table.cell(dashboard, 0, 3, "TP3 Hits", bgcolor=color.green, text_color=color.white)
+    table.cell(dashboard, 1, 3, str.tostring(tp3Count), bgcolor=color.white, text_color=color.black)
+    
+    table.cell(dashboard, 0, 4, "TP4 Hits", bgcolor=color.green, text_color=color.white)
+    table.cell(dashboard, 1, 4, str.tostring(tp4Count), bgcolor=color.white, text_color=color.black)
+
+    table.cell(dashboard, 0, 5, "TP5 Hits", bgcolor=color.green, text_color=color.white)
+    table.cell(dashboard, 1, 5, str.tostring(tp5Count), bgcolor=color.white, text_color=color.black)
+    
+    table.cell(dashboard, 0, 6, "Stop Losses", bgcolor=color.red, text_color=color.white)
+    table.cell(dashboard, 1, 6, str.tostring(slCount), bgcolor=color.white, text_color=color.black)
+    
+    table.cell(dashboard, 0, 7, "Breakevens", bgcolor=color.orange, text_color=color.white)
+    table.cell(dashboard, 1, 7, str.tostring(beCount), bgcolor=color.white, text_color=color.black)
+    
+    table.cell(dashboard, 0, 8, "Total Profit", bgcolor=color.purple, text_color=color.white)
+    table.cell(dashboard, 1, 8, str.tostring(strategy.netprofit), bgcolor=color.white, text_color=color.black)
+
+// Table Results
+tableBgcolor = #686868
+if barstate.islastconfirmedhistory
+    var tbl = table.new(position.bottom_right, 3, 3, bgcolor=tableBgcolor, frame_width=2, frame_color=color.black, border_width=2, border_color=color.black)
+    table.cell(tbl, 0, 1, "Total trades: " + str.tostring(strategy.closedtrades), bgcolor=color.gray, text_size=size.small, text_color=color.white, text_valign=text.align_center)
+    table.cell(tbl, 0, 2, "Win Rate: " + str.tostring(math.round(strategy.wintrades / strategy.closedtrades * 100, 2)) + "%", bgcolor=color.gray, text_size=size.small, text_color=color.white, text_valign=text.align_center)
+    table.cell(tbl, 0, 0, "Initial capital: " + str.tostring(strategy.initial_capital), bgcolor=color.gray, text_size=size.small, text_color=color.white, text_valign=text.align_center)
+    table.cell(tbl, 1, 0, "Net profit: " + str.tostring(math.round(strategy.netprofit, 2)) + " (" + str.tostring(math.round(strategy.netprofit / strategy.initial_capital * 100, 2)) + "%)", bgcolor=strategy.netprofit > 0 ? color.teal : color.maroon, text_size=size.small, text_color=color.white, text_valign=text.align_center)
+    table.cell(tbl, 1, 1, "Current net worth: " + str.tostring(math.round(strategy.equity, 2)), bgcolor=strategy.netprofit > 0 ? color.teal : color.red, text_size=size.small, text_color=color.white, text_valign=text.align_center)
+    table.cell(tbl, 1, 2, "Maximum DrawDown: " + str.tostring(math.round(strategy.max_drawdown)) + " (" + str.tostring(math.round(strategy.max_drawdown / strategy.initial_capital * 100, 2)) + "%)", bgcolor=color.maroon, text_size=size.small, text_color=color.white, text_valign=text.align_center)
