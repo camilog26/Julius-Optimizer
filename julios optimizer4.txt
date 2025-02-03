@@ -1,0 +1,207 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at 
+// https://mozilla.org/MPL/2.0
+//
+// @version=6
+//
+// LNL Scalper Strategy
+//
+// Inspirado por Linda Bradford Raschke & Quant Trade Edge
+// 
+// Creado por L&L Capital
+// Modificado para mejorar elementos visuales, evitando errores de arrays y ajustando posiciones de etiquetas
+//
+
+strategy("LNL Scalper Strategy", shorttitle="LNL Scalper Strategy", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// Inputs
+TrendStrength         = input.int(20, title="Trend Strength", tooltip="Longitud ajustable para el EMA de tendencia.", inline="Trend")
+ATRLength             = input.int(7, title="ATR Length", tooltip="Longitud del ATR para los cálculos.", inline="ATR")
+RoundNumbersTo        = input.int(2, title="Round Numbers To", tooltip="Cantidad de decimales para mostrar.", inline="Round")
+TargetATR             = input.float(2, title="Target = ATR /", tooltip="Fórmula para el target.", inline="Target")
+StopATR               = input.float(1, title="Stop = ATR *", tooltip="Fórmula para el stop.", inline="Stop")
+VolumeFilter          = input.bool(true, title="Enable Volume Filter", tooltip="Señales solo si el volumen supera la media.", inline="Volume")
+
+// Configuración visual
+LabelSize             = input.string("normal", title="Label Size", options=["small", "normal", "large"], tooltip="Tamaño de las etiquetas.")
+TakeProfitLevels      = input.string("1.5,2.5,3.6,5,6", title="Take Profit Levels (%)", tooltip="Niveles de TP en porcentajes, separados por comas.")
+TakeProfitPercentages = input.string("20,20,20,20,20", title="Take Profit Percentages (%)", tooltip="Porcentajes de capital a tomar en cada TP, separados por comas.")
+StopLossPercentage    = input.float(1, title="Stop Loss Percentage (%)", tooltip="Porcentaje para stop loss.", inline="Stop")
+
+// Inputs para control de etiquetas y líneas
+TPLabelAlignment      = input.string("left", title="TP Label Alignment", options=["left", "right"], tooltip="Alineación de las etiquetas TP.")
+TPLabelOffset         = input.int(5, title="TP Label Offset", tooltip="Distancia de las etiquetas desde el borde del gráfico.")
+TPLineExtension       = input.int(50, title="TP Line Extension", tooltip="Extensión de las líneas TP hacia la derecha cuando la posición está activa.")
+TPLabelStyle          = input.string("outside", title="TP Label Style", options=["inside", "outside"], tooltip="Estilo de posicionamiento de las etiquetas TP.")
+
+// Funciones y definiciones
+avg         = ta.ema(close, TrendStrength)
+rsi         = ta.rsi(close, 30)
+volumeMA    = ta.sma(volume, 20)
+TrendColor  = avg < open and avg < close and rsi > 50 ? color.new(#00C8E8, 0) : 
+              avg > open and avg > close and rsi < 50 ? color.new(#FF6B6B, 0) : 
+              color.new(color.gray, 0)
+plot(avg, title="Trend", color=TrendColor, linewidth=2)
+
+// ATR, Target & Stop cálculos
+atr    = ta.atr(ATRLength)
+target = atr / TargetATR
+stop   = atr * StopATR
+
+// Variables para tracking de posición y TP
+var string positionState = "neutral"  // "long", "short" o "neutral"
+var float  entryPrice    = na         // Precio de entrada
+var int    entryBarIndex = na         // Barra de entrada
+var int    exitBarIndex  = na         // Barra de cierre de la posición
+
+// Declaración de arreglos para TP
+var bool[] tpHit = array.new_bool(0)  // Inicialmente vacío; se reinicializará al abrir la operación.
+var line[] tpLineIds  = array.new_line()
+var label[] tpLabelIds = array.new_label()
+
+// Función para crear etiquetas TP
+// labelType: "objective" (objetivo, etiqueta amarilla) o "hit" (TP alcanzado, etiqueta azul)
+// Se ajusta la posición de la etiqueta según lo solicitado:
+//   - Para "hit": sin desplazamiento (aparece justo en el inicio de la vela de señal)
+//   - Para "objective": se invierte la posición respecto al input TPLabelAlignment.
+createTPLabel(barIndex, price, labelContent, labelType) =>
+    // Para "objective" (amarilla) invertimos la alineación:
+    newAlignment = labelType == "objective" ? (TPLabelAlignment == "left" ? "right" : "left") : TPLabelAlignment
+    // Para "objective", asignamos offset positivo si originalmente era left, y negativo si era right
+    newOffset = labelType == "objective" ? (TPLabelAlignment == "left" ? TPLabelOffset : -TPLabelOffset) : 0
+    // El estilo lo asignamos según la opción "inside"/"outside" y la nueva alineación
+    newStyle = TPLabelStyle == "outside" ? (newAlignment == "left" ? label.style_label_left : label.style_label_right) : (newAlignment == "left" ? label.style_label_left : label.style_label_right)
+    // Colores: objetivo = amarillo, hit = azul
+    bgColor = labelType == "objective" ? color.yellow : color.new(#00C8E8, 0)
+    txtColor = labelType == "objective" ? color.black : color.white
+    label.new(barIndex + newOffset, price, labelContent, color=bgColor, textcolor=txtColor, size=LabelSize=="small" ? size.small : LabelSize=="large" ? size.large : size.normal, style=newStyle)
+
+// Señales y Labels
+if barstate.isconfirmed
+    if VolumeFilter and volume < volumeMA
+        na
+    else
+        // Entrada LONG
+        if TrendColor == color.new(#00C8E8, 0) and positionState != "long"
+            strategy.entry("Long", strategy.long)
+            positionState := "long"
+            entryPrice := close
+            entryBarIndex := bar_index
+            exitBarIndex := na
+            tpLevels = str.split(TakeProfitLevels, ",")
+            tpPercentages = str.split(TakeProfitPercentages, ",")
+            tpCount = array.size(tpLevels)
+            tpHit := array.new_bool(tpCount, false)
+            array.clear(tpLineIds)
+            array.clear(tpLabelIds)
+            
+            // Etiqueta de entrada
+            label.new(bar_index, low - atr, "🚀 LONG", 
+                     color=color.new(#00C8E8, 0), 
+                     textcolor=color.white, 
+                     size=LabelSize=="small" ? size.small : LabelSize=="large" ? size.large : size.normal, 
+                     style=label.style_label_down)
+            
+            // Crear líneas y etiquetas TP
+            for i = 0 to tpCount - 1
+                tp = array.get(tpLevels, i)
+                tpPrice = entryPrice * (1 + str.tonumber(tp) / 100)
+                
+                // Línea TP: iniciada en la barra de entrada, x2 se actualizará mientras la posición esté activa
+                lId = line.new(entryBarIndex, tpPrice, entryBarIndex + TPLineExtension, tpPrice,
+                     color=color.yellow, width=1, style=line.style_dotted)
+                array.push(tpLineIds, lId)
+                
+                // Etiqueta de objetivo (amarilla) ubicada en el lado invertido
+                labelContent = "🎯 TP " + str.tostring(tp) + "% (" + str.tostring(math.round(tpPrice, 2)) + ")"
+                lbl = createTPLabel(entryBarIndex, tpPrice, labelContent, "objective")
+                array.push(tpLabelIds, lbl)
+
+        // Entrada SHORT
+        if TrendColor == color.new(#FF6B6B, 0) and positionState != "short"
+            strategy.entry("Short", strategy.short)
+            positionState := "short"
+            entryPrice := close
+            entryBarIndex := bar_index
+            exitBarIndex := na
+            tpLevels = str.split(TakeProfitLevels, ",")
+            tpPercentages = str.split(TakeProfitPercentages, ",")
+            tpCount = array.size(tpLevels)
+            tpHit := array.new_bool(tpCount, false)
+            array.clear(tpLineIds)
+            array.clear(tpLabelIds)
+            
+            // Etiqueta de entrada
+            label.new(bar_index, high + atr, "📉 SHORT", 
+                     color=color.new(#FF6B6B, 0), 
+                     textcolor=color.white, 
+                     size=LabelSize=="small" ? size.small : LabelSize=="large" ? size.large : size.normal, 
+                     style=label.style_label_down)
+            
+            // Crear líneas y etiquetas TP
+            for i = 0 to tpCount - 1
+                tp = array.get(tpLevels, i)
+                tpPrice = entryPrice * (1 - str.tonumber(tp) / 100)
+                
+                // Línea TP
+                lId = line.new(entryBarIndex, tpPrice, entryBarIndex + TPLineExtension, tpPrice,
+                     color=color.yellow, width=1, style=line.style_dotted)
+                array.push(tpLineIds, lId)
+                
+                // Etiqueta de objetivo (amarilla)
+                labelContent = "🎯 TP " + str.tostring(tp) + "% (" + str.tostring(math.round(tpPrice, 2)) + ")"
+                lbl = createTPLabel(entryBarIndex, tpPrice, labelContent, "objective")
+                array.push(tpLabelIds, lbl)
+
+        // Cierre de posición
+        if TrendColor == color.new(color.gray, 0)
+            exitBarIndex := bar_index
+            strategy.close("Long")
+            strategy.close("Short")
+            positionState := "neutral"
+            entryPrice := na
+            entryBarIndex := na
+            // Se deja la información gráfica final sin limpiar para conservar la marca de cierre
+            label.new(bar_index, na, "✖️ CLOSE", 
+                     color=color.new(color.gray, 0), 
+                     textcolor=color.white, 
+                     size=LabelSize=="small" ? size.small : LabelSize=="large" ? size.large : size.normal, 
+                     style=label.style_label_down)
+
+// Actualización dinámica de líneas y etiquetas mientras la posición está activa
+if barstate.islast and not na(entryPrice) and positionState != "neutral"
+    for i = 0 to array.size(tpLineIds) - 1
+        line_id = array.get(tpLineIds, i)
+        label_id = array.get(tpLabelIds, i)
+        
+        // Actualizar la línea: se extiende desde la barra de entrada hasta la barra actual + extensión
+        line.set_x2(line_id, bar_index + TPLineExtension)
+        
+        // Actualizar la etiqueta "objective": se fija en la posición invertida respecto al entryBarIndex
+        label.set_x(label_id, entryBarIndex + (TPLabelAlignment == "left" ? TPLabelOffset : -TPLabelOffset))
+        label.set_y(label_id, line.get_y1(line_id))
+
+// Verificación de TP alcanzados
+if not na(entryPrice)
+    tpLevels = str.split(TakeProfitLevels, ",")
+    tpPercentages = str.split(TakeProfitPercentages, ",")
+    
+    for i = 0 to array.size(tpLevels) - 1
+        tp = array.get(tpLevels, i)
+        tpPrice = positionState == "long" ? entryPrice * (1 + str.tonumber(tp) / 100) : entryPrice * (1 - str.tonumber(tp) / 100)
+        tpPercentage = str.tonumber(array.get(tpPercentages, i))
+        
+        if not array.get(tpHit, i) and ((positionState == "long" and high >= tpPrice) or (positionState == "short" and low <= tpPrice))
+            strategy.close("Take Profit " + str.tostring(tp) + "%", qty_percent=tpPercentage)
+            // Crear etiqueta para TP alcanzado (azul) justo en el inicio de la vela de señal (sin offset)
+            createTPLabel(bar_index, tpPrice, "🎯 TP " + str.tostring(tp) + "%", "hit")
+            array.set(tpHit, i, true)
+
+// ATR, Target & Stop Tabla
+Table = table.new(position=position.top_right, columns=8, rows=1, bgcolor=color.gray)
+if barstate.islast
+    table.cell(table_id=Table, column=1, row=0, text="ATR:", height=0, text_color=color.rgb(0,0,0), text_halign=text.align_center, text_size=size.auto, text_valign=text.align_center, bgcolor=color.yellow)
+    table.cell(table_id=Table, column=2, row=0, text=str.tostring(math.round(atr, RoundNumbersTo)), height=0, text_color=color.rgb(0,0,0), text_halign=text.align_center, text_size=size.auto, text_valign=text.align_center, bgcolor=color.yellow)
+    table.cell(table_id=Table, column=3, row=0, text="Target:", height=0, text_color=color.rgb(0,0,0), text_halign=text.align_center, text_size=size.auto, text_valign=text.align_center, bgcolor=#00C8E8)
+    table.cell(table_id=Table, column=4, row=0, text=str.tostring(math.round(target, RoundNumbersTo)), height=0, text_color=color.rgb(0,0,0), text_halign=text.align_center, text_size=size.auto, text_valign=text.align_center, bgcolor=#00C8E8)
+    table.cell(table_id=Table, column=5, row=0, text="Stop:", height=0, text_color=color.rgb(0,0,0), text_halign=text.align_center, text_size=size.auto, text_valign=text.align_center, bgcolor=#FF6B6B)
+    table.cell(table_id=Table, column=6, row=0, text=str.tostring(math.round(stop, RoundNumbersTo)), height=0, text_color=color.rgb(0,0,0), text_halign=text.align_center, text_size=size.auto, text_valign=text.align_center, bgcolor=#FF6B6B)
