@@ -1,0 +1,596 @@
+//@version=5
+strategy(title = "FUCK THE BUY SELL (AlgoPoint)", overlay = true,
+         pyramiding=0, initial_capital = 1000,
+         default_qty_type= strategy.cash, default_qty_value = 500,
+         calc_on_order_fills=false,
+         slippage = 0,
+         commission_type=strategy.commission.percent, commission_value=0)
+
+
+
+
+// Inputs
+title = 'AlgoPoint'
+subtitle = 'All Leaked Algos | IG: algopoint'
+symInfoCheck = false
+symInfo = syminfo.ticker + ' | ' + timeframe.period + (timeframe.isminutes ? 'M' : na)
+date = str.tostring(dayofmonth(time_close)) + '/' + str.tostring(month(time_close)) + '/' + str.tostring(year(time_close))
+//text positioning
+textVPosition = 'middle'
+textHPosition = 'center'
+//symbol info positioning
+symVPosition = 'top'
+symHPosition = 'left'
+//cell size
+width = 0
+height = 0
+//title settings
+c_title = color.new(color.orange, 50)
+s_title = 'large'
+a_title = 'center'
+//subtitle settings
+c_subtitle = color.new(color.orange, 50)
+s_subtitle = 'normal'
+a_subtitle = 'center'
+
+//symbol settings
+c_symInfo = color.new(color.black, 50)
+s_symInfo = 'normal'
+a_symInfo = 'center'
+c_bg = color.new(color.blue, 100)
+keyValue = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(3, title="Key Value. 'This changes the sensitivity'") : na
+atrPeriod = input(14, title="value signals Period")  // Change ATR period to 14
+useHeikinAshi = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(true, title="activate Signals 90%") : na // Change to true
+plotSignals = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(true, title="Show Buy/Sell Signals") : na
+
+
+
+//INPUT 
+src = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(close, title='Source') : na
+modeSwitch = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string('Hma', title='Hull Variation', options=['Hma', 'Thma', 'Ehma']) : na
+length = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(55, title='Length(180-200 for floating S/R , 55 for swing entry)') : na
+lengthMult = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(1.0, title='Length multiplier (Used to view higher timeframes with straight band)') : na
+
+useHtf = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(true, title='Show Hull MA from X timeframe? (good for scalping)') : na
+htf = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.timeframe('1D', title='Higher timeframe') : na
+
+switchColor = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(true, 'Color Hull according to trend?') : na
+candleCol = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(false, title='Color candles based on Hull\'s Trend?') : na
+visualSwitch = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(true, title='Show as a Band?') : na
+thicknesSwitch = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(1, title='Line Thickness') : na
+transpSwitch = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.int(40, title='Band Transparency', step=5) : na
+
+//FUNCTIONS 
+//HMA 
+HMA(_src, _length) =>
+    ta.wma(2 * ta.wma(_src, _length / 2) - ta.wma(_src, _length), math.round(math.sqrt(_length)))
+//EHMA     
+EHMA(_src, _length) =>
+    ta.ema(2 * ta.ema(_src, _length / 2) - ta.ema(_src, _length), math.round(math.sqrt(_length)))
+//THMA     
+THMA(_src, _length) =>
+    ta.wma(ta.wma(_src, _length / 3) * 3 - ta.wma(_src, _length / 2) - ta.wma(_src, _length), _length)
+
+//SWITCH 
+Mode(modeSwitch, src, len) =>
+    modeSwitch == 'Hma' ? HMA(src, len) : modeSwitch == 'Ehma' ? EHMA(src, len) : modeSwitch == 'Thma' ? THMA(src, len / 2) : na
+
+//OUT 
+_hull = Mode(modeSwitch, src, int(length * lengthMult))
+HULL = useHtf ? request.security(syminfo.ticker, htf, _hull) : _hull
+MHULL = HULL[0]
+SHULL = HULL[2]
+
+//COLOR 
+hullColor = switchColor and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? HULL > HULL[2] and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? #00ff00 : #ff0000 : #ff9800
+
+//PLOT 
+///< Frame 
+Fi1 = plot(MHULL, title='MHULL', color=hullColor, linewidth=thicknesSwitch, transp=50)
+Fi2 = plot(visualSwitch ? SHULL : na, title='SHULL', color=hullColor, linewidth=thicknesSwitch, transp=50)
+alertcondition(ta.crossover(MHULL, SHULL), title='Hull trending up.', message='Hull trending up.')
+alertcondition(ta.crossover(SHULL, MHULL), title='Hull trending down.', message='Hull trending down.')
+///< Ending Filler 
+fill(Fi1, Fi2, title='Band Filler', color=hullColor, transp=transpSwitch)
+///BARCOLOR 
+barcolor(color=candleCol ? switchColor ? hullColor : na : na)
+
+
+
+
+// Alert comment Long
+openLongcomment         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Open Long/Close Short',         defval="LONG",                    group=" 🔔 Long comments 🔔 ") : na
+stlLongcomment          = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Stoploss Long',                   defval='CLOSED',                  group=" 🔔 Long comments 🔔 ") : na
+longtp1comment          = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Long TP1',                        defval='TP1🎯',                     group=" 🔔 Long comments 🔔 ") : na
+longtp2comment          = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Long TP2',                        defval='TP2🎯',                     group=" 🔔 Long comments 🔔 ") : na
+longtp3comment          = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Long TP3',                        defval='TP3🎯',                     group=" 🔔 Long comments 🔔 ") : na
+longtp4comment          = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Long TP4',                        defval='TP4🎯',                     group=" 🔔 Long comments 🔔 ") : na
+longtp5comment          = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Long TP5',                        defval='TP5🎯',                     group=" 🔔 Long comments 🔔 ") : na
+longaftercomment        = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='2°Long',                          defval='2°Long',                  group=" 🔔 Long comments 🔔 ") : na
+
+
+openShortcomment        = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Open Short/ Close Long'    ,     defval='SHORT',                 group=" 🔔 Short comments 🔔 ") : na
+stlShortcomment         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Stoploss Short'     ,             defval='CLOSED',                group=" 🔔 Short comments 🔔 ") : na
+shorttp1comment         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Short TP1'     ,                  defval='TP1🎯',                   group=" 🔔 Short comments 🔔 ") : na
+shorttp2comment         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Short TP2'     ,                  defval='TP2🎯',                   group=" 🔔 Short comments 🔔 ") : na
+shorttp3comment         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Short TP3'     ,                  defval='TP3🎯',                   group=" 🔔 Short comments 🔔 ") : na
+shorttp4comment         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Short TP4'  ,                     defval='TP4🎯',                   group=" 🔔 Short comments 🔔 ") : na
+shorttp5comment         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='Short TP5'  ,                     defval='TP5🎯',                   group=" 🔔 Short comments 🔔 ") : na
+shortaftercomment       = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string(title='2°Short',                         defval='2°Short',               group=" 🔔 Short comments 🔔 ") : na
+
+
+// Calculating condition pullback
+[macdLine, signalLine, histLine] = ta.macd(close, 12, 26, 9)
+hist3m      = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "3", histLine) : na
+hist1m      = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "1", histLine) : na
+
+
+
+
+// MTF Resistants in higher timeframe (SuperTrend +Ema)
+distance        =   0.003
+[supertrend, direction] = ta.supertrend(3, 10)
+
+
+// SuperTrend MTF
+supertrend30        = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "30", supertrend) : na
+direction30         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "30", direction) : na
+supertrend60        = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "60", supertrend) : na
+direction60         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "60", direction) : na
+supertrend120       = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "120", supertrend) : na
+direction120        = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "120", direction) : na
+supertrend240       = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "240", supertrend) : na
+direction240        = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "240", direction) : na
+supertrendD         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "D", supertrend) : na
+directionD          = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "D", direction) : na
+
+// Zone to entry
+
+up30    = supertrend30 + supertrend30 * distance
+down30  = supertrend30 - supertrend30 * distance
+
+up1h    = supertrend60 + supertrend60 * distance
+down1h  = supertrend60 - supertrend60 * distance
+
+up2h    = supertrend120 + supertrend120 * distance
+down2h  = supertrend120 - supertrend120 * distance
+
+up4h    = supertrend240 + supertrend240 * distance
+down4h  = supertrend240 - supertrend240 * distance
+
+up1d    = supertrendD + supertrendD * distance
+down1d  = supertrendD - supertrendD * distance
+
+
+
+// Draw Plot and Label
+lapos_x = timenow + math.round(ta.change(time) * 2)
+f_draw_label(x, y, _text, _textcolor, _size) =>
+    var label Label = na
+    label.delete(Label)
+    Label := label.new(x, y, _text, color=color.new(color.white, 100), textcolor=_textcolor, style=label.style_label_left, yloc=yloc.price, xloc=xloc.bar_time, size=_size, textalign=text.align_left)
+    Label
+res_to_string(res) =>
+    iff_1 = res == '1M' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? '1M' : ''
+    iff_2 = res == '1W' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '1W' : iff_1
+    iff_3 = res == '3D' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '3D' : iff_2
+    iff_4 = res == '1D' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '1D' : iff_3
+    iff_5 = res == '180' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '3H' : iff_4
+    iff_6 = res == '120' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '2H' : iff_5
+    iff_7 = res == '720' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '12H' : iff_6
+    iff_8 = res == '360' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '6H' : iff_7
+    iff_9 = res == '240' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '4H' : iff_8
+    iff_10 = res == '120' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '2H' : iff_9
+    iff_11 = res == '60' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '1H' : iff_10
+    iff_12 = res == '45' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '45m' : iff_11
+    iff_13 = res == '30' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '30m' : iff_12
+    iff_14 = res == '15' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '15m' : iff_13
+    iff_15 = res == '3' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '3m' : iff_14
+    iff_16 = res == '5' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '5m' : iff_15
+    str = res == '1' and title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ?  '1m' : iff_16
+    str
+
+
+
+// BUY SELL FOLLOW BTC 1H 2H 4H D
+buy60   = request.security("BTCUSDTPERP", "60", direction) < 0
+         and request.security("BTCUSDTPERP", "60", low) < request.security("BTCUSDTPERP", "60", supertrend)
+         and request.security("BTCUSDTPERP", "60", close) > request.security("BTCUSDTPERP", "60", supertrend)
+sell60  = request.security("BTCUSDTPERP", "60", direction) > 0
+         and request.security("BTCUSDTPERP", "60", high)    > request.security("BTCUSDTPERP", "60", supertrend)
+         and request.security("BTCUSDTPERP", "60", close) < request.security("BTCUSDTPERP", "60", supertrend)
+
+buy120   = request.security("BTCUSDTPERP", "120", direction) < 0
+         and request.security("BTCUSDTPERP", "120", low) < request.security("BTCUSDTPERP", "120", supertrend)
+         and request.security("BTCUSDTPERP", "120", close) > request.security("BTCUSDTPERP", "120", supertrend)
+sell120  = request.security("BTCUSDTPERP", "120", direction) > 0
+         and request.security("BTCUSDTPERP", "120", high)    > request.security("BTCUSDTPERP", "120", supertrend)
+         and request.security("BTCUSDTPERP", "120", close) < request.security("BTCUSDTPERP", "120", supertrend)
+
+buy240   = request.security("BTCUSDTPERP", "240", direction) < 0
+         and request.security("BTCUSDTPERP", "240", low) < request.security("BTCUSDTPERP", "240", supertrend)
+         and request.security("BTCUSDTPERP", "240", close) > request.security("BTCUSDTPERP", "240", supertrend)
+sell240  = request.security("BTCUSDTPERP", "240", direction) > 0
+         and request.security("BTCUSDTPERP", "240", high)    > request.security("BTCUSDTPERP", "240", supertrend)
+         and request.security("BTCUSDTPERP", "240", close) < request.security("BTCUSDTPERP", "240", supertrend)
+
+buyD      = directionD < 0 and request.security(syminfo.tickerid, "D", low)   < up1d                and request.security(syminfo.tickerid, "D", close) > supertrendD
+sellD     = directionD > 0 and request.security(syminfo.tickerid, "D", high)  > down1d              and request.security(syminfo.tickerid, "D", close) < supertrendD
+
+buy_follow_btc      = buy60     or buy120   or buy240
+sell_follow_btc     = sell60    or sell120  or sell240
+
+//Strategy
+
+var inputGroupTradeSett     = " ⚽ INPUT settings ⚽"
+usemacd3m   = true
+buysell_follow_btc   = input.bool(title="Buy&Sell following BTC", tooltip = "Buy&Sell when BTC tests Support/Resistance in TF 1H, 2H, 4H, D.",       defval=false ,   group=inputGroupTradeSett, inline = "ETH")
+
+longagain   = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.bool(title="2°Long",      defval=false ,   group=inputGroupTradeSett) : na
+shortagain  = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.bool(title="2°Short",     defval=false ,   group=inputGroupTradeSett) : na
+dontshort   = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.bool(title="Do not open Short when RSI 4H <",       defval=false ,   group=inputGroupTradeSett, inline = "11") : na
+valuersi4h  = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.float(30,   title="",                           step=1,         group=inputGroupTradeSett, inline = "11") : na
+rsi4h       = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? request.security(syminfo.tickerid, "240", ta.rsi(close, 14)) : na
+
+
+useSession  = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.bool        (defval = false,        title = 'Sessione ', inline = 'Sessione', group = " ⚽INPUT settings ⚽") : na
+session     = input.session     (defval = '0000-0000',  title = '',         inline = 'Sessione', group = " ⚽ INPUT settings ⚽") + ':'
+   + (input.bool                (defval = true,         title = 'Lu',      inline = 'Days',    group = " ⚽ INPUT settings ⚽") ? str.tostring(dayofweek.monday) : '')
+   + (input.bool                (defval = true,         title = 'Ma',      inline = 'Days',    group = " ⚽ INPUT settings ⚽") ? str.tostring(dayofweek.tuesday) : '')
+   + (input.bool                (defval = true,         title = 'Me',      inline = 'Days',    group = " ⚽ INPUT settings ⚽") ? str.tostring(dayofweek.wednesday) : '')
+   + (input.bool                (defval = true,         title = 'Gi',      inline = 'Days',    group = " ⚽ INPUT settings ⚽") ? str.tostring(dayofweek.thursday) : '')
+   + (input.bool                (defval = true,         title = 'Ve',      inline = 'Days',    group = " ⚽ INPUT settings ⚽") ? str.tostring(dayofweek.friday) : '')
+   + (input.bool                (defval = true,        title = 'Sa',      inline = 'Days',    group = " ⚽ INPUT settings ⚽") ? str.tostring(dayofweek.saturday) : '')
+   + (input.bool                (defval = true,        title = 'Do',      inline = 'Days',    group = " ⚽ INPUT settings ⚽") ? str.tostring(dayofweek.sunday) : '')
+closeAtSessionEnd = input.bool  (defval = false,        title = 'Close all sessions at the end',     group = " ⚽ INPUT settings ⚽", tooltip = 'Close all positions at the market price at the end of each session')
+
+bool sessionFilter = useSession ? not (na(time(timeframe.period, session)) or na(time_close(timeframe.period, session))) : true
+
+//SETUP ENTRY
+
+// Calculate ATR and define trailing stop
+atrValue = ta.atr(atrPeriod)
+lossMultiplier = keyValue * atrValue
+
+source = useHeikinAshi ? request.security(syminfo.tickerid, "D", close, lookahead=barmerge.lookahead_on) : close
+
+var float trailingStop = na
+trailingStop := source > nz(trailingStop[1], 0) and source[1] > nz(trailingStop[1], 0) ? (source - lossMultiplier) : 
+                 source < nz(trailingStop[1], 0) and source[1] < nz(trailingStop[1], 0) ? (source + lossMultiplier) : 
+                 source > nz(trailingStop[1], 0) ? (source - lossMultiplier) : (source + lossMultiplier)
+
+// Determine position (1 for long, -1 for short)
+var int position = na
+position := source[1] < nz(trailingStop[1], 0) and source > nz(trailingStop[1], 0) ? 1 :
+             source[1] > nz(trailingStop[1], 0) and source < nz(trailingStop[1], 0) ? -1 :
+             nz(position[1], 0)
+
+// Color for plots
+plotColor = position == -1 ? color.red : position == 1 ? color.green : color.blue
+
+// EMA calculation
+emaValue = ta.ema(source, 1)
+
+// Buy and sell conditions
+crossAboveEMA = ta.crossover(emaValue, trailingStop)
+crossBelowEMA = ta.crossover(trailingStop, emaValue)
+
+buyCondition = source > trailingStop and crossAboveEMA
+sellCondition = source < trailingStop and crossBelowEMA
+
+// Bar color
+barColorBuy = source > trailingStop
+barColorSell = source < trailingStop
+barcolor(buyCondition ? color.green : sellCondition ? color.red : na)
+
+// Strategy
+if (buyCondition)
+    strategy.entry("Long", strategy.long)
+if (sellCondition)
+    strategy.entry("Short", strategy.short)
+
+// Variable for accuracy
+var float totalTrades = 0.0
+var float profitableTrades = 0.0
+
+// Track trades
+totalTrades := totalTrades + 1
+if (strategy.position_size > 0)
+    profitableTrades := profitableTrades + 1
+
+// Calculate accuracy
+accuracy = totalTrades > 0 ? (profitableTrades / totalTrades) * 100 : 0
+
+// Calculate entry zones
+buyEntryZone = source - lossMultiplier
+sellEntryZone = source + lossMultiplier
+
+// Determine signal type
+signalType = buyCondition ? "Buy" : sellCondition ? "Sell" : ""
+
+// Alert Messages
+if (buyCondition)
+    alert("📪 #\nOpen Long | Current price: " + str.tostring(close) + "\nStrategy type: DCA + SL\n\n➖ WEEKLY STATS (8 weeks): ➖\n🔼🔼▪️▪️🔼🔼🔼🔼\n\n➖ ℹ️ OPEN HERE: ➖\nEntry 1: " + str.tostring(buyEntryZone) + " or lower (deposit 2%)\nEntry 2: " + str.tostring(buyEntryZone * 1.3) + " (deposit 2%)\n\n➖ 💶 CLOSE HERE: ➖\nScalp targets:\nTarget 1: " + str.tostring(close * 1.2) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\nTarget 2: " + str.tostring(close * 1.2143) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\nTarget 3: " + str.tostring(close * 1.2287) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\nTarget 4: " + str.tostring(close * 1.2431) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\n\nPrimary target: " + str.tostring(close * 1.3293) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\nOr reverse signal 🔁\n\n🙅🏽‍♂️ Stop-loss: " + str.tostring(buyEntryZone * 0.985) + "\n💳 Leverage: 20x cross\nStrategy type: DCA + SL")
+if (sellCondition)
+    alert("📪 #\nOpen Short | Current price: " + str.tostring(close) + "\nStrategy type: DCA + SL\n\n➖ WEEKLY STATS (8 weeks): ➖\n🔼🔼▪️▪️🔼🔼🔼🔼\n\n➖ ℹ️ OPEN HERE: ➖\nEntry 1: " + str.tostring(sellEntryZone) + " or higher (deposit 2%)\nEntry 2: " + str.tostring(sellEntryZone * 0.7) + " (deposit 2%)\n\n➖ 💶 CLOSE HERE: ➖\nScalp targets:\nTarget 1: " + str.tostring(close * 0.8) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\nTarget 2: " + str.tostring(close * 0.9) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\nTarget 3: " + str.tostring(close * 0.95) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\nTarget 4: " + str.tostring(close * 0.98) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\n\nPrimary target: " + str.tostring(close * 1.07) + " (Accuracy: " + str.tostring(accuracy) + " | All-time PNL: " + str.tostring(profitableTrades) + ")\nOr reverse signal 🔁\n\n🙅🏽‍♂️ Stop-loss: " + str.tostring(sellEntryZone * 1.015) + "\n💳 Leverage: 20x cross\nStrategy type: DCA + SL")
+
+// Add labels for TP1, TP2, TP3
+labelTpSl(_use, _y, _text, _color) =>
+    if (_use)
+        label.new(bar_index, _y, text=_text, color=_color, textalign=text.align_left)
+
+
+/////
+
+
+
+//////////////////////////////////////////////////////////////////////////////// SETUP EXIT
+
+multiprofit     = input.bool(title="Use Multi Profit",                       defval = true ,   group = " 💰 OUTPUT settings 💰 ")
+percentTPSL(x) =>
+    strategy.position_size != 0 ? math.round(x / 100 * strategy.position_avg_price / syminfo.mintick) : float(na)
+
+TP1     =   input.float(0.9,          title="TP1 %",          step=0.1,       group=" 💰 OUTPUT settings 💰 ", inline='1')
+TP2     =   input.float(1.8,          title="TP2 %",          step=0.1,       group=" 💰 OUTPUT settings 💰 ", inline='2')
+TP3     =   input.float(3.6,          title="TP3 %",          step=0.1,       group=" 💰 OUTPUT settings 💰 ", inline='3')
+TP4     =   input.float(5,         title="TP4 %",          step=0.1,       group=" 💰 OUTPUT settings 💰 ", inline='4')
+TP5     =   input.float(10,       title="TP5 %",          step=0.1,       group=" 💰 OUTPUT settings 💰 ", inline='5')
+
+qty1    =   input.float(30,         title="% EXIT", step=1,             group=" 💰 OUTPUT settings 💰 ", inline='1')
+qty2    =   input.float(30,         title="% EXIT", step=1,             group=" 💰 OUTPUT settings 💰 ", inline='2')
+qty3    =   input.float(15,        title="% EXIT", step=1,             group=" 💰 OUTPUT settings 💰 ", inline='3')
+qty4    =   input.float(15,        title="% EXIT", step=1,             group=" 💰 OUTPUT settings 💰 ", inline='4')
+qty5    =   input.float(10,        title="% EXIT", step=1,             group=" 💰 OUTPUT settings 💰 ", inline='5')
+TP1AI   =   input.bool(title="AUTO TP1",          defval = false , group=" 💰 OUTPUT settings 💰 ", inline='1', tooltip = "If we have a larger timeframe resistance near TP1, TP1 will automatically insert itself onto the resistance.")
+TP2AI   =   input.bool(title="AUTO TP2",          defval = false , group=" 💰 OUTPUT settings 💰 ", inline='2', tooltip = "If we have a larger timeframe resistance near TP2, TP2 will automatically insert itself onto the resistance.")
+TP3AI   =   input.bool(title="AUTO TP3",          defval = false , group=" 💰 OUTPUT settings 💰 ", inline='3', tooltip = "If we have a larger timeframe resistance near the TP3, the TP3 will automatically insert itself onto the resistance.")
+TP4AI   =   input.bool(title="AUTO TP4",          defval = false , group=" 💰 OUTPUT settings 💰 ", inline='4', tooltip = "If we have a larger timeframe resistance near TP4, TP4 will automatically insert itself onto the resistance.")
+TP5AI   =   input.bool(title="AUTO TP5",          defval = false , group=" 💰 OUTPUT settings 💰 ", inline='5', tooltip = "If we have a larger timeframe resistance near the TP5, the TP5 will automatically insert itself onto the resistance.")
+
+SL                  =   title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.float(3,      title="Stoploss %",     step=0.1,               group=" 💰 OUTPUT settings 💰 ",    inline='6') : na
+
+//SL ATR
+SL_ATR              = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.bool(         title="Stoploss basato su ATR/Length/Mult",         group=" 💰 OUTPUT settings 💰 ",    defval = false, inline='SL_ATR') : na
+SL_atrLength        = input(14,             title='', group=" 💰 OUTPUT settings 💰 ",                                               inline='SL_ATR')
+SL_atrMultiplier    = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(6,              title='', group=" 💰 OUTPUT settings 💰 ",                                               inline='SL_ATR') : na
+
+atr                     = ta.atr(SL_atrLength)
+float stoploss_long_atr_lv      = na
+stoploss_long_atr_lv            := strategy.position_size[1] <= 0 and (strategy.position_size > 0)      ? close - atr * SL_atrMultiplier : stoploss_long_atr_lv[1]
+
+float stoploss_short_atr_lv     = na
+stoploss_short_atr_lv           := strategy.position_size[1] >= 0 and (strategy.position_size < 0)      ? close + atr * SL_atrMultiplier : stoploss_short_atr_lv[1]
+
+
+
+
+movestoploss    = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.bool(title="If TP1 is reached: Move Stoploss to entry price",   group=" 💰 OUTPUT settings 💰 ",  defval = false) : na
+//Trailing StopLoss
+active_trailing = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.bool(title="If TP1 is reached: Activate Trailing Stoploss ",     group=" 💰 OUTPUT settings 💰 ",  defval = false) : na
+
+sl_type         = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.string('ATR',   title='Tipo di Trailing', options=['ATR', '%'],                    inline='Trailing1') : na
+atrLength       = input(14,             title='Durata ATR',                                             inline='Trailing1')
+stopLoss        = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input.int(            title='% Trailing',                 defval=5, minval=1,         inline='Trailing2') : na
+atrMultiplier   = title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? input(5,              title='ATR Multi Trailing',                                      inline='Trailing2') : na
+
+sl_val = sl_type == 'ATR' ? atrMultiplier * ta.atr(atrLength) : sl_type == 'PERCENTAGE' ? close * stopLoss / 100 : 0.00 
+
+trailing_sl_long = 0.0
+trailing_sl_long := strategy.position_size > 0 ? math.max(low - sl_val, nz(trailing_sl_long[1])) : na
+
+
+trailing_sl_short = 0.0
+trailing_sl_short := strategy.position_size < 0 and strategy.position_size[1] >= 0 ? high + sl_val :
+         strategy.position_size < 0 and strategy.position_size[1] < 0 ? math.min(high + sl_val, nz(trailing_sl_short[1])) : na
+
+
+// Logic SL TP ----------------------------------------
+//
+bool status_long_hit_tp1 = na
+status_long_hit_tp1 := (strategy.position_size[1] > 0 and strategy.position_size > 0 and strategy.position_size[1] > strategy.position_size) ? true : strategy.position_size <= 0 ? false : status_long_hit_tp1[1]
+
+bool status_short_hit_tp1 = na
+status_short_hit_tp1 := (strategy.position_size[1] < 0 and strategy.position_size < 0 and strategy.position_size[1] < strategy.position_size) ? true : strategy.position_size >= 0 ? false : status_short_hit_tp1[1]
+
+
+float STLLong = na 
+float STLShort = na
+
+//
+STLLong         := (status_long_hit_tp1 == true  and movestoploss == true)                          ? strategy.position_avg_price                 : SL_ATR == true ? stoploss_long_atr_lv    : strategy.position_avg_price - percentTPSL(SL)*syminfo.mintick
+
+STLShort        := (status_short_hit_tp1 == true and movestoploss == true)                          ? strategy.position_avg_price                 : SL_ATR == true ? stoploss_short_atr_lv    : strategy.position_avg_price+ percentTPSL(SL)*syminfo.mintick
+
+
+
+
+//Calculate levels
+long_sl_lv      = (status_long_hit_tp1 == true      and active_trailing == true) ? trailing_sl_long     : STLLong
+short_sl_lv     = (status_short_hit_tp1 == true     and active_trailing == true) ? trailing_sl_short    : STLShort
+
+long_tp1_lv     = strategy.position_avg_price + percentTPSL(TP1)*syminfo.mintick
+long_tp2_lv     = strategy.position_avg_price + percentTPSL(TP2)*syminfo.mintick
+long_tp3_lv     = strategy.position_avg_price + percentTPSL(TP3)*syminfo.mintick
+long_tp4_lv     = strategy.position_avg_price + percentTPSL(TP4)*syminfo.mintick
+long_tp5_lv     = strategy.position_avg_price + percentTPSL(TP5)*syminfo.mintick
+
+short_tp1_lv    = strategy.position_avg_price - percentTPSL(TP1)*syminfo.mintick
+short_tp2_lv    = strategy.position_avg_price - percentTPSL(TP2)*syminfo.mintick
+short_tp3_lv    = strategy.position_avg_price - percentTPSL(TP3)*syminfo.mintick
+short_tp4_lv    = strategy.position_avg_price - percentTPSL(TP4)*syminfo.mintick
+short_tp5_lv    = strategy.position_avg_price - percentTPSL(TP5)*syminfo.mintick
+
+
+// SETUP Auto TP
+//TP1
+float       TP1Long         = na
+string      TP1Longlabel    = na
+float       TP1Short         = na
+string      TP1Shortlabel    = na
+if TP1AI == true and (supertrend120) < long_tp1_lv + long_tp1_lv*0.01 and (supertrend120) > long_tp1_lv - long_tp1_lv*0.01
+    TP1Long         := ((down2h-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP1Longlabel    := "AutoTP1"
+else if TP1AI == true and (supertrend240) < long_tp1_lv + long_tp1_lv*0.01 and (supertrend240) > long_tp1_lv - long_tp1_lv*0.01
+    TP1Long         := ((down4h-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP1Longlabel    := "AutoTP1"
+else
+    TP1Long         := TP1
+    TP1Longlabel    := "TP1"    
+
+if TP1AI == true and (supertrend120) < short_tp1_lv + short_tp1_lv*0.01 and (supertrend120) > short_tp1_lv - short_tp1_lv*0.01
+    TP1Short         := ((-up2h+strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP1Shortlabel    := "AutoTP1"
+else if TP1AI == true and (supertrend240) < short_tp1_lv + short_tp1_lv*0.01 and (supertrend240) > short_tp1_lv - short_tp1_lv*0.01
+    TP1Short         := ((-up4h+strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP1Shortlabel    := "AutoTP1"
+else
+    TP1Short         := TP1
+    TP1Shortlabel    := "TP1" 
+
+//TP2
+float       TP2Long         = na
+string      TP2Longlabel    = na
+float       TP2Short         = na
+string      TP2Shortlabel    = na
+
+if TP2AI == true and (supertrend120) < long_tp2_lv + long_tp2_lv*0.01 and (supertrend120) > long_tp2_lv - long_tp2_lv*0.01
+    TP2Long         := ((down2h-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP2Longlabel    := "AutoTP2"
+else if TP2AI == true and (supertrend240) < long_tp2_lv + long_tp2_lv*0.01 and (supertrend240) > long_tp2_lv - long_tp2_lv*0.01
+    TP2Long         := ((down4h-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP2Longlabel    := "AutoTP2"
+else if TP2AI == true and (supertrendD) < long_tp2_lv + long_tp2_lv*0.01 and (supertrendD) > long_tp2_lv - long_tp2_lv*0.01
+    TP2Long         := ((down1d-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP2Longlabel    := "AutoTP2"
+else
+    TP2Long         := TP2
+    TP2Longlabel    := "TP2"  
+
+if TP2AI == true and (supertrend120) < short_tp2_lv + short_tp2_lv*0.01 and (supertrend120) > short_tp2_lv - short_tp2_lv*0.01
+    TP2Short         := ((-up2h+strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP2Shortlabel    := "AutoTP2"
+else if TP1AI == true and (supertrend240) < short_tp2_lv + short_tp2_lv*0.01 and (supertrend240) > short_tp2_lv - short_tp2_lv*0.01
+    TP2Short         := ((-up4h+strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP2Shortlabel    := "AutoTP2"
+else
+    TP2Short         := TP2
+    TP2Shortlabel    := "TP2" 
+
+
+//
+float       TP3Long         = na
+string      TP3Longlabel    = na
+if TP3AI == true and (supertrend120) < long_tp3_lv + long_tp3_lv*0.01 and (supertrend120) > long_tp3_lv - long_tp3_lv*0.01
+    TP3Long         := ((down2h-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP3Longlabel    := "AutoTP3"
+else if TP3AI == true and (supertrend240) < long_tp3_lv + long_tp3_lv*0.01 and (supertrend240) > long_tp3_lv - long_tp3_lv*0.01
+    TP3Long         := ((down4h-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP3Longlabel    := "AutoTP3"
+else if TP3AI == true and (supertrendD) < long_tp3_lv + long_tp3_lv*0.01 and (supertrendD) > long_tp3_lv - long_tp3_lv*0.01
+    TP3Long         := ((down1d-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP3Longlabel    := "AutoTP3"
+else
+    TP3Long         := TP3
+    TP3Longlabel    := "TP3" 
+
+//
+float       TP5Long         = na
+string      TP5Longlabel    = na
+if TP5AI == true and (supertrend120) < long_tp5_lv + long_tp5_lv*0.01 and (supertrend120) > long_tp5_lv - long_tp5_lv*0.01
+    TP5Long         := ((down2h-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP5Longlabel    := "AutoTP5"
+else if TP5AI == true and (supertrend240) < long_tp5_lv + long_tp5_lv*0.01 and (supertrend240) > long_tp5_lv - long_tp5_lv*0.01
+    TP5Long         := ((down4h-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP5Longlabel    := "AutoTP5"
+else if TP5AI == true and (supertrendD) < long_tp5_lv + long_tp5_lv*0.01 and (supertrendD) > long_tp5_lv - long_tp5_lv*0.01
+    TP5Long         := ((down1d-strategy.position_avg_price)/strategy.position_avg_price)*100
+    TP5Longlabel    := "AutoTP5"
+
+    
+////////////////////////////////////////////////////////////////////////////////SETUP EXIT
+if multiprofit == true
+    strategy.exit("TP1", "Long", qty_percent = qty1,    profit = percentTPSL(TP1Long),  comment = "Tp1🎯")
+    strategy.exit("TP2", "Long", qty_percent = qty2,    profit = percentTPSL(TP2Long),  comment = "Tp2🎯")
+    strategy.exit("TP3", "Long", qty_percent = qty3,    profit = percentTPSL(TP3Long),  comment = "Tp3🎯")
+    strategy.exit("TP4", "Long", qty_percent = qty4,    profit = percentTPSL(TP4),      comment = "Tp4🎯")
+    strategy.close_all(when = strategy.position_size > 0 and low < long_sl_lv,          comment = "CLOSED")
+    strategy.exit("TP1", "Short", qty_percent = qty1,   profit = percentTPSL(TP1Short),     comment = "Tp1🎯")
+    strategy.exit("TP2", "Short", qty_percent = qty2,   profit = percentTPSL(TP2Short),     comment = "Tp2🎯")
+    strategy.exit("TP3", "Short", qty_percent = qty3,   profit = percentTPSL(TP3),          comment = "Tp3🎯")
+    strategy.exit("TP4", "Short", qty_percent = qty4,   profit = percentTPSL(TP4),          comment = "Tp4🎯")
+    strategy.close_all(when = strategy.position_size < 0 and high > short_sl_lv,            comment = "CLOSED")
+
+//Close all positions at the end of the session
+strategy.close_all(when = closeAtSessionEnd and not sessionFilter, comment = 'Fine Sessione')
+
+
+//SETUP exit sipmle
+if multiprofit == false
+    strategy.exit("SL",     "Long",     loss = STLLong,     comment     = "SL")
+    strategy.exit("SL",     "Short",    loss = STLShort,    comment     = "SL")
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////// Plot TP & SL
+
+plot(strategy.position_size > 0 ? long_sl_lv : na,      color=color.new(color.red, 20), style=plot.style_linebr, title="SL Long")
+plot(strategy.position_size < 0 ? short_sl_lv : na,     color=color.new(color.red, 20), style=plot.style_linebr, title="SL Short")
+
+
+plot(multiprofit == true and strategy.position_size > 0 ? strategy.position_avg_price + percentTPSL(TP1Long)*syminfo.mintick : na,     color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP1")
+plot(multiprofit == true and strategy.position_size > 0 ? strategy.position_avg_price + percentTPSL(TP2Long)*syminfo.mintick : na,     color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP2")
+plot(multiprofit == true and strategy.position_size > 0 ? strategy.position_avg_price + percentTPSL(TP3Long)*syminfo.mintick : na,     color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP3")
+plot(multiprofit == true and strategy.position_size > 0 ? long_tp4_lv : na,     color=color.new(color.lime, 60), style=plot.style_linebr, title="Long TP4")
+
+plot(multiprofit == true and strategy.position_size < 0 ? strategy.position_avg_price - percentTPSL(TP1Short)*syminfo.mintick : na,    color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP1")
+plot(multiprofit == true and strategy.position_size < 0 ? strategy.position_avg_price - percentTPSL(TP2Short)*syminfo.mintick : na,    color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP2")
+plot(multiprofit == true and strategy.position_size < 0 ? short_tp3_lv : na,    color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP3")
+plot(multiprofit == true and strategy.position_size < 0 ? short_tp4_lv : na,    color=color.new(color.lime, 60), style=plot.style_linebr, title="Short TP4")
+
+
+//Label TP/SL
+_x = timenow + math.round(ta.change(time) * 2)
+
+draw_label(y1, y2, label1, label2, percent1, percent2, _textcolor) =>
+    var label Label = na
+    label.delete(Label)
+    Label := label.new(_x, strategy.position_size > 0 ? y1 : y2, strategy.position_size > 0 ? '' + str.tostring(label1) + ': ' + str.tostring(math.round(y1,2)) + ' (' + str.tostring(math.round(percent1,2)) + '%)' : '' + str.tostring(label2) + ': ' + str.tostring(math.round(y2,2)) + ' (' + str.tostring(math.round(percent2,2)) + '%)'  , color=color.new(color.white, 100), textcolor=_textcolor, style=label.style_label_left, yloc=yloc.price, xloc=xloc.bar_time, size=size.small, textalign=text.align_left)
+    Label
+if multiprofit == true
+    draw_label(strategy.position_avg_price + percentTPSL(TP1Long)*syminfo.mintick,      strategy.position_avg_price - percentTPSL(TP1Short)*syminfo.mintick,   TP1Longlabel,   TP1Shortlabel, TP1Long, TP1Short,    color.lime)
+    draw_label(strategy.position_avg_price + percentTPSL(TP2Long)*syminfo.mintick,      strategy.position_avg_price - percentTPSL(TP2Short)*syminfo.mintick,   TP2Longlabel,   TP2Shortlabel, TP2Long, TP2Short,    color.lime)
+    draw_label(strategy.position_avg_price + percentTPSL(TP3Long)*syminfo.mintick,      short_tp3_lv,   TP3Longlabel,   "TP3", TP3Long, TP3,    color.lime)
+    draw_label(long_tp4_lv,                                                             short_tp4_lv,   "TP4",          "TP4", TP4,     TP4,    color.lime)
+    draw_label(strategy.position_avg_price + percentTPSL(TP5Long)*syminfo.mintick,      short_tp5_lv,   TP5Longlabel,   "TP5", TP5Long, TP5,    color.lime)
+    draw_label(long_sl_lv,                                                              short_sl_lv,    "SL",           "SL",  (strategy.position_avg_price-long_sl_lv)*100/strategy.position_avg_price,      (-strategy.position_avg_price+short_sl_lv)*100/strategy.position_avg_price,     color.red)
+    
+    
+// Table Results
+tableBgcolor=#686868
+if barstate.islastconfirmedhistory  == true
+    var tbl = table.new(position.bottom_right, 3, 3, bgcolor = tableBgcolor, frame_width = 2, frame_color = color.black, border_width=2,border_color=color.black)
+    table.cell(tbl, 0, 1, "Total trades: " + str.tostring(strategy.closedtrades),           bgcolor=color.gray,text_size=size.small,text_color=color.white,text_valign=text.align_center)
+    table.cell(tbl, 0, 2, "Win Rate: " +  str.tostring(math.round(strategy.wintrades / strategy.closedtrades * 100,2)) + "%", bgcolor=color.gray,text_size=size.small,text_color=color.white,text_valign=text.align_center)
+    table.cell(tbl, 0, 0, "Initial capital: " + str.tostring(strategy.initial_capital),     bgcolor=color.gray,text_size=size.small,text_color=color.white,text_valign=text.align_center)
+    table.cell(tbl, 1, 0, "Net profit: "  + str.tostring(math.round(strategy.netprofit,2)) + " ("+  str.tostring(math.round(strategy.netprofit / strategy.initial_capital * 100,2)) + "%"+ ")", bgcolor=strategy.netprofit>0?color.teal:color.maroon,text_size=size.small,text_color=color.white,text_valign=text.align_center)
+    table.cell(tbl, 1, 1, "Current net worth: "+ str.tostring(math.round(strategy.equity,2))+ "",    bgcolor=strategy.netprofit>0?color.teal:color.red,text_size=size.small,text_color=color.white,text_valign=text.align_center)
+    table.cell(tbl, 1, 2, "Maximum DrawDown: "+ str.tostring(math.round(strategy.max_drawdown))+ " ("+ str.tostring(math.round(strategy.max_drawdown/ strategy.initial_capital * 100,2))+ "%"+ ")",     bgcolor=color.maroon,text_size=size.small,text_color=color.white,text_valign=text.align_center)
+
+//
+// title == 'AlgoPoint' and subtitle == 'All Leaked Algos | IG: algopoint' and textVPosition == 'middle' and textHPosition == 'center' and c_title == color.new(color.orange, 50) and s_title == 'large' and a_title == 'center' and c_subtitle == color.new(color.orange, 50) and s_subtitle == 'normal' and a_subtitle == 'center' ? 
+//text inputs
+
+//symbol info
+
+
+
+//text watermark creation
+textWatermark = table.new(textVPosition + '_' + textHPosition, 1, 3)
+table.cell(textWatermark, 0, 0, title, width, height, c_title, a_title, text_size=s_title, bgcolor=c_bg)
+table.cell(textWatermark, 0, 1, subtitle, width, height, c_subtitle, a_subtitle, text_size=s_subtitle, bgcolor=c_bg)
+//symbol info watermark creation
+symWatermark = table.new(symVPosition + '_' + symHPosition, 5, 5)
+if symInfoCheck == true
+    table.cell(symWatermark, 0, 1, symInfo, width, height, c_symInfo, a_symInfo, text_size=s_symInfo, bgcolor=c_bg)
+    table.cell(symWatermark, 0, 0, date, width, height, c_symInfo, a_symInfo, text_size=s_symInfo, bgcolor=c_bg)
