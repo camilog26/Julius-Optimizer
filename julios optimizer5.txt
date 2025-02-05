@@ -1,0 +1,168 @@
+//@version=6
+strategy("LNL Scalper Strategy Mod", shorttitle="LNL Scalper Mod", overlay=true, max_lines_count=500, max_labels_count=500, pyramiding=5, process_orders_on_close=false, calc_on_every_tick=true)
+
+// ********** Pestaña "Entrada de Datos" **********
+TrendStrength = input.int(20, title="Trend Strength", tooltip="Longitud ajustable para el EMA de tendencia.", group="Entrada de Datos")
+TP1 = input.float(1.5, title="Take Profit Level 1 (%)", group="Entrada de Datos")
+TP1_Percentage = input.float(20, title="Take Profit Percentage 1 (%)", group="Entrada de Datos")
+TP2 = input.float(2.5, title="Take Profit Level 2 (%)", group="Entrada de Datos")
+TP2_Percentage = input.float(20, title="Take Profit Percentage 2 (%)", group="Entrada de Datos")
+TP3 = input.float(3.6, title="Take Profit Level 3 (%)", group="Entrada de Datos")
+TP3_Percentage = input.float(20, title="Take Profit Percentage 3 (%)", group="Entrada de Datos")
+TP4 = input.float(5, title="Take Profit Level 4 (%)", group="Entrada de Datos")
+TP4_Percentage = input.float(20, title="Take Profit Percentage 4 (%)", group="Entrada de Datos")
+TP5 = input.float(6, title="Take Profit Level 5 (%)", group="Entrada de Datos")
+TP5_Percentage = input.float(20, title="Take Profit Percentage 5 (%)", group="Entrada de Datos")
+StopLossPercentage = input.float(1, title="Stop Loss Percentage (%)", tooltip="Porcentaje para stop loss.", group="Entrada de Datos")
+VolumeFilter = input.bool(true, title="Enable Volume Filter", tooltip="Señales solo si el volumen supera la media.", group="Entrada de Datos")
+EnableTPObjectivesDisplay = input.bool(true, title="Enable TP Objectives Display", tooltip="Mostrar líneas y etiquetas de niveles de Take Profit.", group="Entrada de Datos")
+ShowAllTP = input.bool(true, title="Show TPs for All Positions", tooltip="Mostrar etiquetas y líneas de TP para todas las posiciones.", group="Entrada de Datos")
+
+// ********** Pestaña "Estilo" **********
+LabelSize = input.string("normal", title="Label Size", options=["small", "normal", "large"], tooltip="Tamaño de las etiquetas.", group="Estilo")
+TPLabelAlignment = input.string("left", title="TP Label Alignment", options=["left", "right"], tooltip="Alineación de las etiquetas TP.", group="Estilo")
+TPLabelOffset = input.int(5, title="TP Label Offset", tooltip="Distancia de las etiquetas desde el borde del gráfico.", group="Estilo")
+TPLineExtension = input.int(50, title="TP Line Extension", tooltip="Extensión de las líneas TP hacia la derecha cuando la posición está activa.", group="Estilo")
+TPLabelStyle = input.string("outside", title="TP Label Style", options=["inside", "outside"], tooltip="Estilo de posicionamiento de las etiquetas TP.", group="Estilo")
+
+// ********** Configuración de Colores **********
+color_teal = color.new(color.rgb(0, 206, 209), 0)
+color_coral = color.new(color.rgb(255, 127, 80), 0)
+color_gray = color.new(color.gray, 0)
+
+// ********** Indicadores y Variables **********
+avg = ta.ema(close, TrendStrength)
+rsi = ta.rsi(close, 30)
+volumeMA = ta.sma(volume, 20)
+atr = ta.atr(7)
+TrendColor = avg < open and avg < close and rsi > 50 ? color_teal : 
+             avg > open and avg > close and rsi < 50 ? color_coral : 
+             color_gray
+
+// ********** Tracking de Posiciones **********
+var string positionState = "neutral"
+var float entryPrice = na
+var int entryBarIndex = na
+var int exitBarIndex = na
+var bool[] tpHit = array.new_bool(0)
+var line[] tpLineIds = array.new_line()
+var label[] tpLabelIds = array.new_label()
+
+// ********** Funciones Personalizadas **********
+createTPLabel(barIndex, price, labelContent, labelType) =>
+    newAlignment = labelType == "objective" ? (TPLabelAlignment == "left" ? "right" : "left") : TPLabelAlignment
+    newOffset = labelType == "objective" ? (TPLabelAlignment == "left" ? TPLabelOffset : -TPLabelOffset) : 0
+    newStyle = TPLabelStyle == "outside" ? (newAlignment == "left" ? label.style_label_left : label.style_label_right) : (newAlignment == "left" ? label.style_label_left : label.style_label_right)
+    bgColor = labelType == "objective" ? color.yellow : labelType == "hit" ? color_teal : labelType == "close_long" ? color.green : color.red
+    txtColor = labelType == "objective" ? color.black : color.white
+    label.new(barIndex + newOffset, price, labelContent, color=bgColor, textcolor=txtColor, size=LabelSize, style=newStyle)
+
+createTPLine(barIndex, tpPrice) =>
+    line.new(barIndex, tpPrice, barIndex + TPLineExtension, tpPrice, color=color.yellow, width=1, style=line.style_dotted)
+
+updateTPLine(lineId, barIndex) =>
+    line.set_x2(lineId, barIndex + TPLineExtension)
+
+// ********** Lógica Principal **********
+plot(avg, title="Trend", color=TrendColor, linewidth=2)
+
+if barstate.isconfirmed
+    if VolumeFilter and volume < volumeMA
+        na
+    else
+        // Entrada LONG
+        if TrendColor == color_teal and positionState != "long"
+            strategy.entry("Long", strategy.long)
+            positionState := "long"
+            entryPrice := close
+            entryBarIndex := bar_index
+            exitBarIndex := na
+            tpLevels = array.from(TP1, TP2, TP3, TP4, TP5)
+            tpPercentages = array.from(TP1_Percentage, TP2_Percentage, TP3_Percentage, TP4_Percentage, TP5_Percentage)
+            tpCount = array.size(tpLevels)
+            tpHit := array.new_bool(tpCount, false)
+            array.clear(tpLineIds)
+            array.clear(tpLabelIds)
+            
+            label.new(bar_index, low - atr, "🚀 LONG", color=color_teal, textcolor=color.white, size=LabelSize, style=label.style_label_down)
+            
+            if EnableTPObjectivesDisplay
+                for i = 0 to tpCount - 1
+                    tp = array.get(tpLevels, i)
+                    tpPrice = entryPrice * (1 + tp / 100)
+                    lId = createTPLine(entryBarIndex, tpPrice)
+                    array.push(tpLineIds, lId)
+                    labelContent = "🎯 TP " + str.tostring(tp) + "% (" + str.tostring(tpPrice, '0.00') + ")"
+                    lbl = createTPLabel(entryBarIndex, tpPrice, labelContent, "objective")
+                    array.push(tpLabelIds, lbl)
+
+        // Entrada SHORT
+        if TrendColor == color_coral and positionState != "short"
+            strategy.entry("Short", strategy.short)
+            positionState := "short"
+            entryPrice := close
+            entryBarIndex := bar_index
+            exitBarIndex := na
+            tpLevels = array.from(TP1, TP2, TP3, TP4, TP5)
+            tpPercentages = array.from(TP1_Percentage, TP2_Percentage, TP3_Percentage, TP4_Percentage, TP5_Percentage)
+            tpCount = array.size(tpLevels)
+            tpHit := array.new_bool(tpCount, false)
+            array.clear(tpLineIds)
+            array.clear(tpLabelIds)
+            
+            label.new(bar_index, high + atr, "📉 SHORT", color=color_coral, textcolor=color.white, size=LabelSize, style=label.style_label_down)
+            
+            if EnableTPObjectivesDisplay
+                for i = 0 to tpCount - 1
+                    tp = array.get(tpLevels, i)
+                    tpPrice = entryPrice * (1 - tp / 100)
+                    lId = createTPLine(entryBarIndex, tpPrice)
+                    array.push(tpLineIds, lId)
+                    labelContent = "🎯 TP " + str.tostring(tp) + "% (" + str.tostring(tpPrice, '0.00') + ")"
+                    lbl = createTPLabel(entryBarIndex, tpPrice, labelContent, "objective")
+                    array.push(tpLabelIds, lbl)
+
+        // Cierre de posición
+        if positionState == "long" and TrendColor != color_teal
+            strategy.close("Long")
+            createTPLabel(bar_index, close, "✖️ CLOSE LONG", "close_long")
+            positionState := "neutral"
+            entryPrice := na
+            entryBarIndex := na
+
+        if positionState == "short" and TrendColor != color_coral
+            strategy.close("Short")
+            createTPLabel(bar_index, close, "✖️ CLOSE SHORT", "close_short")
+            positionState := "neutral"
+            entryPrice := na
+            entryBarIndex := na
+
+// ********** Gestión de TP **********
+if not na(entryPrice)
+    tpLevels = array.from(TP1, TP2, TP3, TP4, TP5)
+    tpPercentages = array.from(TP1_Percentage, TP2_Percentage, TP3_Percentage, TP4_Percentage, TP5_Percentage)
+    
+    for i = 0 to array.size(tpLevels) - 1
+        tp = array.get(tpLevels, i)
+        tpPrice = positionState == "long" ? entryPrice * (1 + tp / 100) : entryPrice * (1 - tp / 100)
+        tpPercentage = array.get(tpPercentages, i)
+        
+        if not array.get(tpHit, i) and ((positionState == "long" and high >= tpPrice) or (positionState == "short" and low <= tpPrice))
+            strategy.exit("TP " + str.tostring(tp) + "%", from_entry=positionState == "long" ? "Long" : "Short", qty_percent=tpPercentage, limit=tpPrice)
+            createTPLabel(bar_index, tpPrice, "🎯 TP " + str.tostring(tp) + "%", "hit")
+            array.set(tpHit, i, true)
+
+// ********** Actualización Dinámica de Líneas **********
+if not na(entryPrice) and positionState != "neutral" and EnableTPObjectivesDisplay
+    for i = 0 to array.size(tpLineIds) - 1
+        line_id = array.get(tpLineIds, i)
+        label_id = array.get(tpLabelIds, i)
+        updateTPLine(line_id, bar_index)
+        label.set_x(label_id, entryBarIndex + (TPLabelAlignment == "left" ? TPLabelOffset : -TPLabelOffset))
+
+// ********** Gestión de Visualización Histórica **********
+if not ShowAllTP
+    for i = 0 to array.size(tpLabelIds) - 1
+        label.delete(array.get(tpLabelIds, i))
+    for i = 0 to array.size(tpLineIds) - 1
+        line.delete(array.get(tpLineIds, i))
